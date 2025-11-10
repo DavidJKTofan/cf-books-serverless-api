@@ -52,6 +52,8 @@ Add the database binding to your `wrangler.json`:
 npx wrangler d1 execute prod-d1-books-serverless-api --file=database_schema_01.sql --remote
 ```
 
+See [database_schema_01.sql](database_schema_01.sql) and [OpenAPI Specification Schema](openapi-spec-schema.yaml).
+
 ### 4. Configure Rate Limiting (Optional)
 
 Add a rate limiting binding to your `wrangler.json`:

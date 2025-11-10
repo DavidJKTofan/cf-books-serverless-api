@@ -2,16 +2,43 @@ openapi: 3.0.3
 info:
   title: Books Serverless API
   version: 1.0.0
-  description: Serverless API for managing a book collection using Cloudflare Workers and D1
+  description: |
+    Production-ready serverless API for managing a book collection using Cloudflare Workers and D1 database.
+
+    Features:
+    - Full CRUD operations with comprehensive input validation
+    - Pagination, filtering, and full-text search
+    - Rate limiting (100 requests/minute per IP)
+    - Response caching for optimized performance
+    - Structured error handling and logging
+
   contact:
     name: API Support
+  license:
+    name: MIT
+
 servers:
-  - url: https://api.dlsdemo.com/
+  - url: https://api.dlsdemo.com
     description: Production server
+
+tags:
+  - name: Health
+    description: API health and monitoring
+  - name: Books
+    description: Book collection management
+  - name: Search
+    description: Search operations
+  - name: Statistics
+    description: Collection statistics
+
 paths:
   /api/health:
     get:
+      tags:
+        - Health
       summary: API Health Check
+      description: Returns the operational status of the API and timestamp
+      operationId: getHealth
       responses:
         '200':
           description: API is healthy
@@ -19,15 +46,33 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - status
+                  - timestamp
                 properties:
                   status:
                     type: string
+                    enum: [healthy]
+                    example: healthy
                   timestamp:
                     type: string
                     format: date-time
+                    example: '2025-11-10T12:00:00.000Z'
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Caching policy
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/stats:
     get:
-      summary: Get API Statistics
+      tags:
+        - Statistics
+      summary: Get Collection Statistics
+      description: Returns overall statistics including total books, genre breakdown, and publication year range
+      operationId: getStats
       responses:
         '200':
           description: Statistics about book collection
@@ -35,48 +80,91 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - totalBooks
+                  - genreBreakdown
+                  - yearRange
                 properties:
                   totalBooks:
                     type: integer
+                    example: 42
                   genreBreakdown:
                     type: array
                     items:
                       type: object
+                      required:
+                        - genre
+                        - count
                       properties:
                         genre:
                           type: string
+                          example: Fiction
                         count:
                           type: integer
+                          example: 15
                   yearRange:
                     type: object
+                    required:
+                      - earliest
+                      - latest
                     properties:
                       earliest:
                         type: integer
+                        nullable: true
+                        example: 1949
                       latest:
                         type: integer
+                        nullable: true
+                        example: 2024
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: public, max-age=300, stale-while-revalidate=600
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
+
   /api/books:
     get:
+      tags:
+        - Books
       summary: List Books
+      description: Returns a paginated list of books with optional filtering by genre and year
+      operationId: listBooks
       parameters:
         - name: page
           in: query
+          description: Page number for pagination
           schema:
             type: integer
+            minimum: 1
             default: 1
+            example: 1
         - name: limit
           in: query
+          description: Number of items per page (max 100)
           schema:
             type: integer
-            default: 10
+            minimum: 1
             maximum: 100
+            default: 10
+            example: 10
         - name: genre
           in: query
+          description: Filter by genre
           schema:
             type: string
+            maxLength: 100
+            example: Science Fiction
         - name: year
           in: query
+          description: Filter by publication year
           schema:
             type: integer
+            minimum: 0
+            example: 1984
       responses:
         '200':
           description: Paginated list of books
@@ -84,6 +172,9 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - data
+                  - pagination
                 properties:
                   data:
                     type: array
@@ -91,23 +182,65 @@ paths:
                       $ref: '#/components/schemas/Book'
                   pagination:
                     type: object
+                    required:
+                      - total
+                      - page
+                      - limit
+                      - pages
                     properties:
                       total:
                         type: integer
+                        example: 42
                       page:
                         type: integer
+                        example: 1
                       limit:
                         type: integer
+                        example: 10
                       pages:
                         type: integer
+                        example: 5
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: public, max-age=60, stale-while-revalidate=120
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
+
     post:
+      tags:
+        - Books
       summary: Create a New Book
+      description: Creates a new book with validation of all fields
+      operationId: createBook
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/BookInput'
+            examples:
+              complete:
+                summary: Complete book entry
+                value:
+                  title: Neuromancer
+                  author: William Gibson
+                  year: 1984
+                  isbn: '9780441569595'
+                  genre: Science Fiction
+                  description: A groundbreaking cyberpunk novel about a washed-up computer hacker hired for one last job.
+              minimal:
+                summary: Minimal required fields
+                value:
+                  title: '1984'
+                  author: George Orwell
       responses:
         '201':
           description: Book created successfully
@@ -115,15 +248,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Book'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/books/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Unique identifier of the book
+        schema:
+          type: integer
+          minimum: 1
+          example: 1
+
     get:
+      tags:
+        - Books
       summary: Get a Specific Book
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
+      description: Returns details of a single book by ID
+      operationId: getBook
       responses:
         '200':
           description: Book details
@@ -131,20 +281,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Book'
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: public, max-age=300, stale-while-revalidate=600
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
     put:
+      tags:
+        - Books
       summary: Update a Book
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
+      description: Updates an existing book. Only provided fields will be updated.
+      operationId: updateBook
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BookInput'
+              $ref: '#/components/schemas/BookUpdate'
+            examples:
+              partial:
+                summary: Partial update
+                value:
+                  genre: Classic Literature
+                  description: Updated description
+              complete:
+                summary: Complete update
+                value:
+                  title: '1984'
+                  author: George Orwell
+                  year: 1949
+                  isbn: '9780451524935'
+                  genre: Dystopian Fiction
+                  description: A dystopian social science fiction novel and cautionary tale
       responses:
         '200':
           description: Book updated successfully
@@ -152,26 +329,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Book'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
     delete:
+      tags:
+        - Books
       summary: Delete a Book
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
+      description: Permanently deletes a book from the collection
+      operationId: deleteBook
       responses:
         '204':
           description: Book deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/books/search:
     get:
+      tags:
+        - Search
       summary: Search Books
+      description: Full-text search across title, author, genre, ISBN, year, and description fields
+      operationId: searchBooks
       parameters:
         - name: q
           in: query
           required: true
+          description: Search query (max 200 characters)
           schema:
             type: string
+            minLength: 1
+            maxLength: 200
+            example: cyberpunk
       responses:
         '200':
           description: Search results
@@ -179,15 +382,35 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - query
+                  - results
+                  - count
                 properties:
                   query:
                     type: string
+                    example: cyberpunk
                   results:
                     type: array
                     items:
                       $ref: '#/components/schemas/Book'
                   count:
                     type: integer
+                    example: 5
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: public, max-age=60, stale-while-revalidate=120
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
+
 components:
   schemas:
     BookInput:
@@ -198,23 +421,190 @@ components:
       properties:
         title:
           type: string
+          minLength: 1
+          maxLength: 500
+          description: Book title
+          example: Neuromancer
         author:
           type: string
+          minLength: 1
+          maxLength: 200
+          description: Book author
+          example: William Gibson
         year:
           type: integer
           minimum: 0
+          maximum: 2035
+          nullable: true
+          description: Publication year
+          example: 1984
         isbn:
           type: string
+          pattern: '^(?:\d{10}|\d{13}|[\d-]{13,17})$'
+          nullable: true
+          description: ISBN-10 or ISBN-13 format
+          example: '9780441569595'
         genre:
           type: string
+          maxLength: 100
+          nullable: true
+          description: Book genre
+          example: Science Fiction
         description:
           type: string
+          maxLength: 5000
+          nullable: true
+          description: Book description
+          example: A groundbreaking cyberpunk novel about a washed-up computer hacker hired for one last job.
+
+    BookUpdate:
+      type: object
+      description: Fields to update (all optional, but at least one must be provided)
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Book title
+          example: '1984'
+        author:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Book author
+          example: George Orwell
+        year:
+          type: integer
+          minimum: 0
+          maximum: 2035
+          nullable: true
+          description: Publication year
+          example: 1949
+        isbn:
+          type: string
+          pattern: '^(?:\d{10}|\d{13}|[\d-]{13,17})$'
+          nullable: true
+          description: ISBN-10 or ISBN-13 format
+          example: '9780451524935'
+        genre:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: Book genre
+          example: Dystopian Fiction
+        description:
+          type: string
+          maxLength: 5000
+          nullable: true
+          description: Book description
+          example: A dystopian social science fiction novel
+
     Book:
       allOf:
-        - $ref: '#/components/schemas/BookInput'
         - type: object
           required:
             - id
           properties:
             id:
               type: integer
+              description: Unique identifier
+              example: 1
+        - $ref: '#/components/schemas/BookInput'
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+          example: Missing required fields title, author
+  responses:
+    BadRequest:
+      description: Bad Request - Invalid input or validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missingFields:
+              summary: Missing required fields
+              value:
+                error: 'Missing required fields: title, author'
+            invalidYear:
+              summary: Invalid year
+              value:
+                error: 'Year must be a valid number between 0 and 2035'
+            invalidISBN:
+              summary: Invalid ISBN
+              value:
+                error: Invalid ISBN format
+            fieldTooLong:
+              summary: Field exceeds maximum length
+              value:
+                error: Title must be 500 characters or less
+            invalidJSON:
+              summary: Invalid JSON
+              value:
+                error: Invalid JSON in request body
+            noValidFields:
+              summary: No valid fields to update
+              value:
+                error: No valid fields to update
+
+    NotFound:
+      description: Not Found - The requested resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Book not found
+
+    RequestTooLarge:
+      description: Request Too Large - Request body exceeds 1MB limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Request body too large (max 1MB)
+
+    RateLimitExceeded:
+      description: Rate Limit Exceeded - Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Rate limit exceeded. Please try again later.
+
+    InternalServerError:
+      description: Internal Server Error - An unexpected error occurred
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: An unexpected error occurred
+
+    GatewayTimeout:
+      description: Gateway Timeout - Database query timeout
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Request timeout
+
+  securitySchemes:
+    RateLimit:
+      type: apiKey
+      in: header
+      name: CF-Connecting-IP
+      description: Rate limiting is applied per IP address (100 requests per minute)
+
+security:
+  - RateLimit: []
