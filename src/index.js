@@ -24,6 +24,7 @@ class RateLimitError extends Error {
 }
 
 const ROUTES = {
+	HOME: new URLPattern({ pathname: '/' }),
 	SEARCH: new URLPattern({ pathname: '/api/books/search' }),
 	BOOKS_COLLECTION: new URLPattern({ pathname: '/api/books' }),
 	SINGLE_BOOK: new URLPattern({ pathname: '/api/books/:id([0-9]+)' }), // Add numeric constraint
@@ -33,6 +34,252 @@ const ROUTES = {
 
 // Allowed fields for updates
 const ALLOWED_UPDATE_FIELDS = ['title', 'author', 'year', 'isbn', 'genre', 'description'];
+
+// Landing page HTML
+const getLandingPage = () => {
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Books Serverless API</title>
+  <style>
+    /* === Reset & Base Styles === */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 100%;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #e4e6eb;
+      background: linear-gradient(135deg, #1a1b3a 0%, #27284f 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    /* === Container === */
+    .container {
+      width: 100%;
+      max-width: 800px;
+      background: #1f1f2e;
+      border-radius: 1rem;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      padding: 3rem;
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* === Typography === */
+    h1 {
+      font-size: 2.25rem;
+      color: #9fa8ff;
+      margin-bottom: 0.75rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 1.1rem;
+      color: #b0b3c5;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .description {
+      margin-bottom: 2rem;
+      color: #c7c9d5;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    /* === Endpoints Section === */
+    .endpoints {
+      background: #2a2b45;
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .endpoints h2 {
+      font-size: 1.3rem;
+      color: #e4e6eb;
+      margin-bottom: 1rem;
+    }
+
+    .endpoint {
+      margin-bottom: 0.75rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.95rem;
+      color: #d2d4e0;
+      word-break: break-all;
+    }
+
+    .endpoint a {
+      color: #9fa8ff;
+      text-decoration: none;
+      transition: color 0.2s, text-shadow 0.2s;
+    }
+
+    .endpoint a:hover,
+    .endpoint a:focus {
+      color: #b8bfff;
+      text-shadow: 0 0 6px rgba(159, 168, 255, 0.6);
+      outline: none;
+    }
+
+    .method {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 0.4rem;
+      font-weight: bold;
+      margin-right: 0.5rem;
+      font-size: 0.75rem;
+      color: #fff;
+    }
+
+    .method.get    { background: #2196f3; }
+    .method.post   { background: #4caf50; }
+    .method.put    { background: #ff9800; }
+    .method.delete { background: #f44336; }
+
+    /* === Disclaimer === */
+    .disclaimer {
+      background: rgba(255, 255, 0, 0.1);
+      border-left: 4px solid #ffc107;
+      padding: 1rem;
+      margin-bottom: 2rem;
+      border-radius: 0.5rem;
+    }
+
+    .disclaimer h3 {
+      color: #ffda6b;
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+    }
+
+    .disclaimer p {
+      color: #ffeb99;
+      font-size: 0.95rem;
+    }
+
+    /* === CTA Button === */
+    .cta {
+      text-align: center;
+      margin-top: 1.5rem;
+    }
+
+    .button {
+      display: inline-block;
+      padding: 0.9rem 2rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 12px rgba(118, 75, 162, 0.4);
+    }
+
+    .button:hover,
+    .button:focus {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(118, 75, 162, 0.6);
+      outline: none;
+    }
+
+    /* === Footer === */
+    .footer {
+      margin-top: 2rem;
+      text-align: center;
+      color: #999;
+      font-size: 0.9rem;
+    }
+
+    /* === Responsive Design === */
+    @media (max-width: 768px) {
+      .container {
+        padding: 2rem 1.5rem;
+      }
+      h1 {
+        font-size: 1.8rem;
+      }
+      .subtitle {
+        font-size: 1rem;
+      }
+      .endpoint {
+        font-size: 0.9rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      h1 {
+        font-size: 1.6rem;
+      }
+      .button {
+        width: 100%;
+        padding: 0.9rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="container" role="main">
+    <header>
+      <h1>📚 Books Serverless API</h1>
+      <p class="subtitle">Simple serverless REST API built with Cloudflare Workers and D1 Database.</p>
+    </header>
+
+    <section class="description">
+      <p>A modern serverless API for managing a book collection with full CRUD operations, search, pagination, and more — powered by Cloudflare Workers.</p>
+    </section>
+
+    <section class="endpoints" aria-label="API Endpoints">
+      <h2>API Endpoints</h2>
+      <div class="endpoint"><span class="method get">GET</span> <a href="/api/health" target="_blank" rel="noopener">/api/health</a></div>
+      <div class="endpoint"><span class="method get">GET</span> <a href="/api/stats" target="_blank" rel="noopener">/api/stats</a></div>
+      <div class="endpoint"><span class="method get">GET</span> <a href="/api/books" target="_blank" rel="noopener">/api/books</a></div>
+      <div class="endpoint"><span class="method post">POST</span> /api/books</div>
+      <div class="endpoint"><span class="method get">GET</span> <a href="/api/books/1" target="_blank" rel="noopener">/api/books/:id</a></div>
+      <div class="endpoint"><span class="method put">PUT</span> /api/books/:id</div>
+      <div class="endpoint"><span class="method delete">DELETE</span> /api/books/:id</div>
+      <div class="endpoint"><span class="method get">GET</span> <a href="/api/books/search?q=romance" target="_blank" rel="noopener">/api/books/search?q=query</a></div>
+    </section>
+
+    <aside class="disclaimer">
+      <h3>⚠️ Disclaimer</h3>
+      <p>This project demonstrates Cloudflare Workers and D1 database capabilities. It is intended for educational and demonstration purposes only.</p>
+    </aside>
+
+    <div class="cta">
+      <a href="https://github.com/DavidJKTofan/cf-books-serverless-api" class="button" target="_blank" rel="noopener noreferrer">
+        View on GitHub →
+      </a>
+    </div>
+
+    <footer class="footer">
+      <p>Built with Cloudflare Workers &amp; D1 Database</p>
+    </footer>
+  </main>
+</body>
+</html>`;
+};
 
 // Input validation helper
 const validateBook = (book, isUpdate = false) => {
@@ -125,6 +372,17 @@ const createResponse = (body, status = 200, headers = {}) => {
 	});
 };
 
+// HTML response helper
+const createHtmlResponse = (html, status = 200) => {
+	return new Response(html, {
+		status,
+		headers: {
+			'Content-Type': 'text/html; charset=utf-8',
+			'Cache-Control': 'public, max-age=3600',
+		},
+	});
+};
+
 // Content-Type validation
 const validateContentType = (request) => {
 	if (['POST', 'PUT'].includes(request.method)) {
@@ -142,9 +400,9 @@ const executeQuery = async (stmt, timeout = 5000) => {
 	return Promise.race([stmt.all(), timeoutPromise]);
 };
 
-// Rate limiting check
+// Rate limit API Binding
+// https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
 const checkRateLimit = async (env, request) => {
-	// https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
 	if (!env.MY_RATE_LIMITER) {
 		return; // Rate limiting not configured
 	}
@@ -197,7 +455,12 @@ export default {
 		const params = url.searchParams;
 
 		try {
-			// Rate limiting check
+			// Home landing page
+			if (ROUTES.HOME.test(url)) {
+				return createHtmlResponse(getLandingPage());
+			}
+
+			// Rate limiting check (skip for home page)
 			await checkRateLimit(env, request);
 
 			// Validate content type for POST/PUT
