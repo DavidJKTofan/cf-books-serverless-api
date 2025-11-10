@@ -17,5 +17,15 @@
 			"database_name": "prod-d1-books-serverless-api",
 			"database_id": "6a73ab2d-fab5-4b6b-b5f4-6085bda2b859"
 		}
+	],
+	"ratelimits": [
+		{
+			"name": "MY_RATE_LIMITER",
+			"namespace_id": "1001",
+			"simple": {
+				"limit": 1500,
+				"period": 60
+			}
+		}
 	]
 }
